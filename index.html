@@ -384,6 +384,26 @@
     if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
     const db = firebase.database();
 
+    // --- LẮNG NGHE TRẠNG THÁI KHÓA/MỞ RÚT TIỀN TỪ BOT ---
+    db.ref('system_settings/withdraw_active').on('value', (snapshot) => {
+        const isActive = snapshot.val();
+        const btnWithdraw = document.getElementById('withdrawBtn');
+        
+        if (isActive === false) {
+            window.isWithdrawLocked = true;
+            if (btnWithdraw) {
+                btnWithdraw.style.backgroundColor = 'gray';
+                btnWithdraw.innerText = 'ĐANG BẢO TRÌ';
+            }
+        } else {
+            window.isWithdrawLocked = false;
+            if (btnWithdraw) {
+                btnWithdraw.style.backgroundColor = 'var(--accent-green)';
+                btnWithdraw.innerText = 'RÚT TIỀN';
+            }
+        }
+    });
+
     const BOT_USERNAME = 'TramNangLuongVuTru_Bot';
     const botToken = "8235163593:AAFoHyyFDKnqc0XBfwF0D2RCp18ND7HE-64";
 
@@ -596,6 +616,10 @@
     }
 
     async function processWithdraw() {
+        if (window.isWithdrawLocked) {
+            return alert("🛑 Hệ thống rút tiền hiện đang bảo trì. Vui lòng quay lại sau!");
+        }
+
         const withdrawBtn = document.getElementById('withdrawBtn');
         const amountInput = document.getElementById('withdraw-amount');
         const amount = Math.floor(Number(amountInput.value));
@@ -631,7 +655,10 @@
                 amountInput.value = "";
                 updateUI();
             } catch (e) { alert("Lỗi gửi yêu cầu! Thử lại sau."); } 
-            finally { withdrawBtn.disabled = false; withdrawBtn.innerText = "RÚT TIỀN"; }
+            finally { 
+                withdrawBtn.disabled = false; 
+                withdrawBtn.innerText = window.isWithdrawLocked ? "ĐANG BẢO TRÌ" : "RÚT TIỀN"; 
+            }
         }
     }
 
@@ -692,5 +719,6 @@
 
     window.addEventListener('DOMContentLoaded', () => { loadUserData(); });
 </script>
+
 </body>
 </html>
