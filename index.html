@@ -1,1 +1,1005 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TRẠM NĂNG LƯỢNG VŨ TRỤ - Premium Edition</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;700&display=swap');
 
+        :root { 
+            --core-color: #00f2fe; 
+            --core-glow: rgba(0, 242, 254, 0.6);
+            --bg-dark: #070b14; 
+            --accent-green: #00e676; 
+            --accent-gold: #ffc107; 
+            --glass-bg: rgba(16, 25, 43, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            background: radial-gradient(circle at top, #111d33 0%, var(--bg-dark) 100%);
+            color: #e2e8f0; 
+            font-family: 'Inter', Tahoma, sans-serif;
+            margin-bottom: 70px; 
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* TYPOGRAPHY */
+        h3, .coin-val, .timer-text, .share-title { font-family: 'Orbitron', sans-serif; }
+
+        /* TAB CONTENT & ANIMATION */
+        .tab-content { 
+            display: none; padding: 12px 15px; padding-bottom: 80px;
+            max-width: 500px; margin: 0 auto; 
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .tab-content.active { display: flex; flex-direction: column; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* GLASSMORPHISM CARDS */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 14px 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin-bottom: 12px;
+            transition: transform 0.2s;
+        }
+
+        /* ALERTS & TOASTS */
+        #custom-alert {
+            position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; 
+            background: linear-gradient(135deg, rgba(20,30,48,0.95), rgba(36,59,85,0.95));
+            border: 1px solid var(--core-color); border-radius: 16px; padding: 15px;
+            z-index: 9999; display: flex; align-items: center; gap: 15px;
+            box-shadow: 0 10px 40px var(--core-glow);
+            transition: top 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        #custom-alert.show { top: 25px; }
+        .alert-icon { font-size: 24px; filter: drop-shadow(0 0 5px var(--core-color)); }
+        .alert-text { flex: 1; font-size: 13px; color: #fff; line-height: 1.5; font-weight: 500; }
+        .alert-close { background: none; border: none; color: #a0aec0; font-size: 20px; cursor: pointer; padding: 5px; }
+
+        #sync-toast {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(90deg, #00b09b, #96c93d); color: white; padding: 6px 18px;
+            border-radius: 30px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+            display: none; z-index: 1000; box-shadow: 0 5px 20px rgba(0, 230, 118, 0.4);
+        }
+
+        /* HEADER & STATUS BARS */
+        .header-status { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 12px; padding: 10px 15px; 
+            background: var(--glass-bg); border-radius: 14px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .status-badge { font-size: 11px; color: #cbd5e1; font-weight: 600;}
+        .level-badge {
+            background: linear-gradient(135deg, var(--core-color), #3a7bd5); color: #fff; 
+            padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 900;
+            box-shadow: 0 0 10px var(--core-glow); text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* MINING CORE AREA */
+        #game-area { 
+            width: 100%; min-height: 190px; display: flex; align-items: center; justify-content: center;
+            border-radius: 20px; margin-bottom: 12px; position: relative;
+            background: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.05)"/></svg>');
+            border: 1px solid var(--glass-border); overflow: hidden;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+        #game-area::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, rgba(0, 242, 254, 0.1) 0%, transparent 70%);
+        }
+
+        .core-container { position: relative; width: 80px; height: 80px; transition: transform 0.1s; z-index: 2; }
+        .core { 
+            width: 100%; height: 100%; background: var(--core-color); border-radius: 50%; 
+            box-shadow: 0 0 30px var(--core-color), inset 0 0 20px rgba(255,255,255,0.8); transition: 0.5s; 
+        }
+        .orbit { position: absolute; border: 1px dashed rgba(0, 242, 254, 0.3); border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+        .orbit-1 { width: 120px; height: 120px; border-top: 3px solid var(--core-color); border-bottom: 3px solid var(--core-color); border-style: solid; opacity: 0.8; }
+        .orbit-2 { width: 165px; height: 165px; border-left: 3px solid var(--accent-gold); border-right: 3px solid var(--accent-gold); border-style: solid; opacity: 0.6;}
+
+        .active-core .core { 
+            animation: pulse 1.5s infinite alternate, core-glow 1.5s infinite alternate; 
+            background: radial-gradient(circle, #fff 0%, var(--core-color) 70%);
+        }
+        .active-core .orbit { display: block; }
+        .active-core .orbit-1 { animation: rotate 4s linear infinite; filter: drop-shadow(0 0 8px var(--core-color)); }
+        .active-core .orbit-2 { animation: rotate 6s linear infinite reverse; filter: drop-shadow(0 0 8px var(--accent-gold)); }
+
+        @keyframes core-glow {
+            from { box-shadow: 0 0 20px var(--core-color), 0 0 30px var(--core-color); }
+            to { box-shadow: 0 0 40px var(--core-color), 0 0 60px #fff; }
+        }
+        @keyframes pulse { from { transform: scale(0.9); } to { transform: scale(1.1); } }
+        @keyframes rotate { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+
+        /* STATS & TEXT */
+        .timer-text { color: #ff4757; font-size: 24px; font-weight: 900; text-shadow: 0 0 15px rgba(255, 71, 87, 0.4); letter-spacing: 2px; }
+        .coin-val { 
+            font-size: 38px; font-weight: 900; 
+            background: linear-gradient(to bottom, #fff, var(--accent-gold));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin: 4px 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+
+        /* BUTTONS */
+        .btn-row { display: flex; gap: 10px; margin-top: 0; margin-bottom: 12px; }
+        .btn { 
+            flex: 1; padding: 14px; border: none; border-radius: 14px; font-weight: 800; cursor: pointer; 
+            text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; transition: all 0.3s ease; 
+        }
+        .btn:active { transform: translateY(2px); }
+        .btn-start { background: rgba(255,255,255,0.05); color: #718096; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-start.ready { 
+            background: linear-gradient(135deg, var(--core-color), #005bea); color: white; 
+            box-shadow: 0 5px 20px var(--core-glow); border: none;
+        }
+        .btn-upgrade { background: rgba(0, 242, 254, 0.05); color: var(--core-color); border: 1px solid var(--core-color); }
+        
+        .btn-claim { 
+            background: linear-gradient(135deg, var(--accent-green), #00b09b); color: white; 
+            padding: 12px 15px; border-radius: 12px; font-size: 11px; font-weight: 700; border: none; cursor: pointer; width: 100%;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3); transition: 0.3s;
+        }
+        .btn-claim:disabled { background: #2d3748; color: #718096; box-shadow: none; cursor: not-allowed; }
+        
+        /* INFO BTN IN HOME */
+        .btn-info-home {
+            background: rgba(255,255,255,0.05); color: #cbd5e1; width: 100%; padding: 12px; 
+            border: 1px solid var(--glass-border); border-radius: 14px; font-size: 12px; 
+            font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn-info-home:active { background: rgba(255,255,255,0.1); }
+
+        /* MODAL THÔNG TIN */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 1000; display: none; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-content {
+            background: linear-gradient(145deg, #0f171e, #070c11); border: 1px solid var(--core-color);
+            width: 90%; max-width: 400px; max-height: 80vh; 
+            border-radius: 20px; position: relative;
+            transform: translateY(30px); transition: transform 0.3s ease;
+            box-shadow: 0 10px 40px rgba(0, 242, 254, 0.2);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px; border-bottom: 1px solid var(--glass-border);
+            background: rgba(0, 0, 0, 0.4);
+        }
+        .modal-header h3 { margin: 0; color: #fff; font-size: 15px; letter-spacing: 0.5px; font-weight: 900;}
+        
+        .modal-body { padding: 20px; overflow-y: auto; }
+
+        .close-modal-btn {
+            background: rgba(255, 71, 87, 0.1);
+            color: #ff4757; border: 1px solid rgba(255, 71, 87, 0.3); width: 32px; height: 32px; border-radius: 50%;
+            font-weight: bold; font-size: 16px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0;
+        }
+        .close-modal-btn:active { background: rgba(255, 71, 87, 0.3); transform: scale(0.9); }
+
+        .intro-card { margin-bottom: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px; }
+        .intro-card:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .intro-card h4 { color: var(--core-color); font-size: 15px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .intro-card p, .intro-card li { font-size: 13px; color: #a0aec0; line-height: 1.6; margin-bottom: 8px; }
+        .intro-card b { color: #e2e8f0; }
+        .intro-card ul { margin-left: 20px; list-style-type: square; color: var(--core-color); }
+
+        /* RANKING (LEADERBOARD) TAB */
+        .rank-item {
+            display: flex; align-items: center; background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border); padding: 12px 15px; border-radius: 14px;
+            margin-bottom: 10px; transition: transform 0.2s;
+        }
+        .rank-item:active { transform: scale(0.98); background: rgba(255,255,255,0.06); }
+        .rank-pos {
+            font-size: 18px; font-weight: 900; width: 35px; color: #cbd5e1;
+            font-family: 'Orbitron'; text-align: center;
+        }
+        .rank-info { flex: 1; margin-left: 10px; }
+        .rank-id { font-size: 13px; color: #fff; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px;}
+        .rank-lvl { font-size: 10px; color: var(--core-color); background: rgba(0, 242, 254, 0.1); padding: 3px 8px; border-radius: 6px; display: inline-block; font-weight: bold;}
+        .rank-gold { font-size: 16px; font-weight: 900; color: var(--accent-green); font-family: 'Orbitron'; text-align: right;}
+        
+        .top-1 .rank-pos { font-size: 24px; }
+        .top-1 { border-color: var(--accent-gold); background: rgba(255, 193, 7, 0.05); box-shadow: 0 0 15px rgba(255, 193, 7, 0.15);}
+        .top-2 { border-color: #e2e8f0; background: rgba(226, 232, 240, 0.05); }
+        .top-3 { border-color: #d97706; background: rgba(217, 119, 6, 0.05); }
+
+        /* TASKS NEW LAYOUT */
+        .task-item { display: flex; flex-direction: column; gap: 10px; }
+        .task-header { display: flex; justify-content: space-between; align-items: center; gap: 10px;}
+        .task-info { flex: 1; overflow: hidden; }
+        .task-info h4 { font-size: 13.5px; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+        .task-info p { font-size: 11px; color: #a0aec0;}
+        .task-reward { 
+            color: var(--accent-gold); font-weight: 900; font-size: 13px; 
+            background: rgba(255, 193, 7, 0.1); padding: 4px 8px; border-radius: 8px; white-space: nowrap;
+        }
+        
+        .task-actions { display: flex; gap: 8px; width: 100%; }
+        .task-actions .btn-link { 
+            flex: 1; background: rgba(0, 136, 204, 0.15); color: #0088cc; padding: 10px; border-radius: 10px; 
+            text-decoration: none; text-align: center; font-size: 10.5px; font-weight: bold; border: 1px solid #0088cc; 
+            display: flex; align-items: center; justify-content: center; margin: 0;
+        }
+        .task-actions .btn-claim { 
+            flex: 1.1; margin: 0; font-size: 10.5px; padding: 10px;
+        }
+
+        /* FORMS & INPUTS */
+        .input-group { position: relative; display: flex; align-items: center; margin-bottom: 15px; }
+        .bank-form input, .input-group input { 
+            width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); 
+            padding: 15px; color: white; border-radius: 14px; font-size: 14px; outline: none; transition: 0.3s;
+        }
+        .bank-form input:focus, .input-group input:focus { border-color: var(--core-color); background: rgba(0, 242, 254, 0.05); }
+        .bank-form input { margin-bottom: 12px; }
+        .btn-all { 
+            position: absolute; right: 10px; background: var(--accent-gold); color: #000; 
+            border: none; padding: 8px 12px; border-radius: 8px; font-size: 11px; font-weight: 900; cursor: pointer; z-index: 5; 
+        }
+
+        /* REFERRAL GRID */
+        .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .ref-stat-box { text-align: center; padding: 20px 10px; }
+        .ref-stat-label { font-size: 11px; color: #a0aec0; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+        .ref-stat-value { font-size: 24px; font-weight: 900; color: var(--core-color); margin-top: 8px; font-family: 'Orbitron'; }
+        
+        .link-box { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        #ref-link { 
+            flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #a0aec0; 
+            padding: 12px 15px; border-radius: 12px; font-size: 12px; outline: none;
+        }
+        .btn-copy-small { 
+            background: var(--core-color); color: #000; border: none; padding: 12px 20px; 
+            border-radius: 12px; font-size: 12px; font-weight: 900; cursor: pointer; flex-shrink: 0; 
+        }
+        
+        .guide-step { display: flex; gap: 15px; margin-bottom: 15px; align-items: flex-start; }
+        .step-num { 
+            background: linear-gradient(135deg, var(--core-color), #005bea); color: #fff; 
+            width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 13px; font-weight: 900; flex-shrink: 0; box-shadow: 0 0 10px var(--core-glow);
+        }
+        .step-text { font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+        .step-text b { color: #fff; }
+
+        /* NAVIGATION BAR */
+        .nav { 
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; 
+            background: rgba(7, 11, 20, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            display: flex; justify-content: space-between; align-items: center;
+            border-top: 1px solid var(--glass-border); z-index: 100;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item { 
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            font-size: 10px; font-weight: 600; color: #4a5568; cursor: pointer; transition: 0.3s;
+            text-align: center; white-space: nowrap;
+        }
+        .nav-item.active { color: var(--core-color); transform: translateY(-3px); }
+        .nav-item span { font-size: 20px; margin-bottom: 4px; filter: grayscale(100%) opacity(0.5); transition: 0.3s; }
+        .nav-item.active span { filter: grayscale(0%) opacity(1); filter: drop-shadow(0 0 5px var(--core-glow)); }
+
+        /* MISC */
+        .help-icon { 
+            background: rgba(0, 242, 254, 0.1); color: var(--core-color); width: 20px; height: 20px; 
+            border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; 
+            font-size: 12px; font-weight: bold; cursor: pointer; border: 1px solid var(--core-color);
+        }
+        .history-item { 
+            background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); padding: 15px; 
+            border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="custom-alert">
+        <div class="alert-icon">🔔</div>
+        <div class="alert-text" id="alert-msg">Đang tải thông báo...</div>
+        <button class="alert-close" onclick="closeAlert()">✕</button>
+    </div>
+
+    <div id="infoModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>THÔNG TIN HỆ THỐNG</h3>
+                <button class="close-modal-btn" onclick="closeInfoModal()">✕</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="intro-card">
+                    <h4>🚀 Trạm Năng Lượng Vũ Trụ Là Gì?</h4>
+                    <p>Trạm Năng Lượng Vũ Trụ là nền tảng khai thác tài nguyên số mô phỏng (Xu) tích hợp trực tiếp trên Telegram WebApp. Người dùng có thể quy đổi Xu sang VND với tỉ lệ <b>1 Xu = 1 VND</b>.</p>
+                </div>
+
+                <div class="intro-card">
+                    <h4>💎 Vật Phẩm Hệ thống</h4>
+                    <ul>
+                        <li><b>Lõi Năng Lượng:</b> Trung tâm xử lý dữ liệu. Phải kích hoạt thủ công mỗi 5 giờ để bắt đầu đào.</li>
+                        <li><b>Thẻ Kích Hoạt (Auto Card):</b> Tự động tái kích hoạt Lõi khi hết thời gian, giúp bạn khai thác liên tục 24/7 ngay cả khi ngoại tuyến.</li>
+                        <li><b>Cấp Độ (Level):</b> Cấp càng cao, tốc độ đào càng nhanh (+50 xu/giờ mỗi cấp).</li>
+                    </ul>
+                </div>
+
+                <div class="intro-card">
+                    <h4>📈 Quy Tắc Khai Thác</h4>
+                    <p>1. <b>Kích hoạt:</b> Nhấn nút Kích Hoạt Lõi tại Trang Chủ để bắt đầu phiên đào trong 5 giờ.</p>
+                    <p>2. <b>Nâng cấp:</b> Dùng 5.000 xu để tăng cấp độ và hiệu suất đào.</p>
+                    <p>3. <b>Mời bạn:</b> Nhận ngẫu nhiên 100 - 5.000 xu và 1 Thẻ Kích Hoạt Tự Động cho mỗi lượt mời thành công qua mã Ref.</p>
+                </div>
+
+                <div class="intro-card">
+                    <h4>💻 Thông Tin Web & Dev</h4>
+                    <p>• <b>Phiên bản:</b> 3.0.0 (Leaderboard Edition)</p>
+                    <p>• <b>Nhà phát triển:</b> NVTCode Developer</p>
+                    <p>• <b>Công nghệ:</b> HTML5, CSS3, Firebase DB.</p>
+                </div>
+                
+                <div style="text-align: center; padding-top: 10px; color: #4a5568; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;">© 2026 TramNangLuongVuTru</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="home" class="tab-content active">
+        <div id="sync-toast">✓ ĐÃ ĐỒNG BỘ CLOUD</div>
+        
+        <div class="header-status">
+            <div class="status-badge">TÍN HIỆU: <span id="statusText" style="color:var(--core-color); font-weight: bold;">ONLINE</span></div>
+            <div class="level-badge">CẤP <span id="lvl">1</span></div>
+        </div>
+
+        <div id="game-area">
+            <div id="core-wrap" class="core-container">
+                <div class="orbit orbit-1" style="opacity: 0.3; width: 180px; height: 180px; border-width: 1px;"></div>
+                <div class="orbit orbit-1"></div>
+                <div class="orbit orbit-2"></div>
+                <div class="core"></div>
+            </div>
+        </div>
+
+        <div class="glass-card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px;">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600;">
+                <span>🎫 Thẻ Kích Hoạt Tự Động</span>
+                <div class="help-icon" onclick="showHelp()">?</div>
+            </div>
+            <div style="color: var(--accent-gold); font-weight: 900; font-size: 14px;"><span id="auto-card-val">0</span> thẻ</div>
+        </div>
+
+        <div class="glass-card" style="text-align: center; padding: 15px;">
+            <div class="timer-text" id="timer">05:00:00</div>
+            <div style="color: #a0aec0; font-size: 11px; margin-top: 6px; font-weight: 600; letter-spacing: 1px;">NĂNG LƯỢNG HIỆN TẠI</div>
+            <div class="coin-val" id="coins">0.0000</div>
+            <div style="font-size: 12px; color: var(--core-color); font-weight: 600;">Hiệu suất: <span id="rate">100</span> xu/giờ</div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-start ready" id="startBtn">KÍCH HOẠT LÕI</button>
+            <button class="btn btn-upgrade" id="upgradeBtn">NÂNG CẤP (5K)</button>
+        </div>
+        
+        <button class="btn-info-home" onclick="openInfoModal()">
+            ℹ️ XEM THÔNG TIN HỆ THỐNG
+        </button>
+    </div>
+
+    <div id="tasks" class="tab-content">
+        <h3 style="text-align: center; margin: 5px 0 10px; color: #fff;">NHIỆM VỤ HÀNG NGÀY</h3>
+        
+        <div style="text-align: center; font-size: 12px; margin-bottom: 20px; color: #a0aec0; line-height: 1.6;">
+            Bạn muốn thêm nhóm, kênh của bạn vào bot hãy<br>
+            <a href="https://t.me/NVTCode" target="_blank" style="color: var(--core-color); text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block; margin-top: 5px;">BẤM VÀO ĐÂY</a><br>
+            <span style="font-size: 10.5px; color: #718096; display: inline-block; margin-top: 8px;">(Lưu ý: Không phải admin web, không hỗ trợ các vấn đề về web như giải đáp thắc mắc, rút tiền,...)</span>
+        </div>
+
+        <div class="glass-card task-item">
+            <div class="task-header">
+                <div class="task-info"><h4>Điểm danh hàng ngày</h4><p>Nhận 100 - 300 xu</p></div>
+                <div class="task-reward" id="reward-daily">??? Xu</div>
+            </div>
+            <button class="btn-claim" id="btn-daily" onclick="claimDaily()" style="margin-top: 5px;">NHẬN THƯỞNG</button>
+        </div>
+        
+        <div class="glass-card task-item">
+            <div class="task-header">
+                <div class="task-info"><h4>Family Miner Pro</h4></div>
+                <div class="task-reward">+1000 Xu</div>
+            </div>
+            <div class="task-actions">
+                <a href="https://t.me/Family_Miner_Pro" target="_blank" class="btn-link">MỞ TELEGRAM</a>
+                <button class="btn-claim" id="btn-group" onclick="checkTelegramDirect('-1003899907254', 'btn-group', 1000)">KIỂM TRA & NHẬN</button>
+            </div>
+        </div>
+        
+        <div class="glass-card task-item">
+            <div class="task-header">
+                <div class="task-info"><h4>Withdraw Miner Pro</h4></div>
+                <div class="task-reward">+1000 Xu</div>
+            </div>
+            <div class="task-actions">
+                <a href="https://t.me/WhitdrawMinerPro" target="_blank" class="btn-link">MỞ TELEGRAM</a>
+                <button class="btn-claim" id="btn-channel" onclick="checkTelegramDirect('-1003611632233', 'btn-channel', 1000)">KIỂM TRA & NHẬN</button>
+            </div>
+        </div>
+        
+        <div class="glass-card task-item">
+            <div class="task-header">
+                <div class="task-info"><h4>Lì Xì</h4></div>
+                <div class="task-reward">+1000 Xu</div>
+            </div>
+            <div class="task-actions">
+                <a href="https://t.me/GR_Co_Xu" target="_blank" class="btn-link">MỞ TELEGRAM</a>
+                <button class="btn-claim" id="btn-lixi" onclick="checkTelegramDirect('-1002900522909', 'btn-lixi', 1000)">KIỂM TRA & NHẬN</button>
+            </div>
+        </div>
+
+        <div class="glass-card task-item">
+            <div class="task-header">
+                <div class="task-info"><h4>Làm Lại Từ Đầu</h4></div>
+                <div class="task-reward">+1000 Xu</div>
+            </div>
+            <div class="task-actions">
+                <a href="https://t.me/lamlaitudau147" target="_blank" class="btn-link">MỞ TELEGRAM</a>
+                <button class="btn-claim" id="btn-new-channel" onclick="checkTelegramDirect('-1002618812008', 'btn-new-channel', 1000)">KIỂM TRA & NHẬN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="leaderboard" class="tab-content">
+        <h3 style="text-align: center; margin: 5px 0 10px; color: var(--accent-gold);">🏆 BẢNG XẾP HẠNG</h3>
+        <p style="text-align: center; font-size: 11px; margin-bottom: 20px; color: #a0aec0;">
+            Top 50 thợ mỏ xuất sắc nhất vũ trụ (Cập nhật Realtime)
+        </p>
+        
+        <div id="leaderboard-list">
+            <div style="text-align:center; color:#a0aec0; padding:20px;">Đang tải dữ liệu...</div>
+        </div>
+    </div>
+
+    <div id="ref" class="tab-content">
+        <h3 style="text-align: center; margin: 5px 0 20px;">CHƯƠNG TRÌNH ĐỐI TÁC</h3>
+        
+        <div class="ref-grid">
+            <div class="glass-card ref-stat-box" style="margin-bottom: 0;">
+                <div class="ref-stat-label">👥 Tổng Ref</div>
+                <div class="ref-stat-value" id="ref-count">0</div>
+            </div>
+            <div class="glass-card ref-stat-box" style="margin-bottom: 0;">
+                <div class="ref-stat-label">🎁 Phần thưởng</div>
+                <div class="ref-stat-value" style="color: var(--accent-green); font-size: 18px;">100-5K / F</div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <div class="share-title" style="font-size: 16px; margin-bottom: 20px; text-align: center; color: var(--core-color);">⚡ LAN TỎA & NHẬN THƯỞNG</div>
+            
+            <div class="link-box">
+                <input type="text" id="ref-link" readonly value="Đang tải link...">
+                <button class="btn-copy-small" onclick="copyRefLink()">COPY</button>
+            </div>
+
+            <div class="guide-step">
+                <div class="step-num">1</div>
+                <div class="step-text">Sao chép <b>Đường dẫn mời</b> của bạn ở phía trên.</div>
+            </div>
+            <div class="guide-step">
+                <div class="step-num">2</div>
+                <div class="step-text">Gửi cho bạn bè hoặc chia sẻ lên các <b>Hội nhóm</b>.</div>
+            </div>
+            <div class="guide-step">
+                <div class="step-num">3</div>
+                <div class="step-text">Nhận ngẫu nhiên <b>100 - 5.000 Xu</b> và <b>1 Thẻ Tự Động</b> khi họ tham gia.</div>
+            </div>
+        </div>
+
+        <div class="glass-card" style="border-style: dashed; border-color: var(--accent-gold); background: rgba(255, 193, 7, 0.05);">
+            <h4 style="color: var(--accent-gold); justify-content: center; text-align: center; margin-bottom: 10px; font-weight: 900; font-size: 15px;">💎 LỢI ÍCH ĐẶC BIỆT</h4>
+            <p style="text-align: center; font-size: 12px; color: #cbd5e1; line-height: 1.6;">Mỗi thẻ tự động giúp bạn đào <b>24/7</b> mà không cần mở máy. Mời càng nhiều, khai thác càng nhanh!</p>
+        </div>
+    </div>
+
+    <div id="acc" class="tab-content">
+        <h3 style="text-align: center; margin: 5px 0 20px;">VÍ CỦA TÔI</h3>
+        
+        <div class="glass-card" style="border-color: rgba(0, 230, 118, 0.3); background: rgba(0, 230, 118, 0.05); text-align: center;">
+            <div style="color: var(--accent-green); font-size: 13px; font-weight: 700; letter-spacing: 1px;">SỐ DƯ KHẢ DỤNG (1XU=1VND)</div>
+            <div class="coin-val" style="color: var(--accent-green); background: none; -webkit-text-fill-color: var(--accent-green);"><span id="balance">0</span> xu</div>
+        </div>
+
+        <div id="bank-section">
+            <div id="bank-info-display" class="glass-card" style="display:none; border-style: dashed; border-color: var(--core-color);">
+                <p style="font-size: 13px; color: #a0aec0; margin-bottom: 8px;">Ngân hàng: <b id="disp-bank" style="color:#fff; font-size: 14px;">...</b></p>
+                <p style="font-size: 13px; color: #a0aec0; margin-bottom: 8px;">Chủ tài khoản: <b id="disp-name" style="color:#fff; font-size: 14px;">...</b></p>
+                <p style="font-size: 13px; color: #a0aec0; margin-bottom: 12px;">Số tài khoản: <b id="disp-num" style="color:var(--core-color); font-family: monospace; font-size: 15px;">...</b></p>
+                <button onclick="editBankInfo()" style="color:var(--accent-gold); font-size:12px; font-weight:bold; cursor:pointer; background:none; border:none; text-decoration:underline;">Sửa thông tin</button>
+            </div>
+            
+            <div id="bank-form-input" class="glass-card bank-form">
+                <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--core-color);">THÔNG TIN RÚT TIỀN</h4>
+                <input type="text" id="input-bank" placeholder="Tên Ngân Hàng (VD: Vietcombank)">
+                <input type="text" id="input-name" placeholder="Chủ Tài Khoản">
+                <input type="number" id="input-num" placeholder="Số Tài Khoản">
+                <button class="btn" style="background: linear-gradient(135deg, var(--core-color), #3a7bd5); color: #fff; width: 100%; margin-top: 10px;" onclick="saveBankInfo()">LƯU THÔNG TIN</button>
+            </div>
+        </div>
+
+        <div id="withdraw-area" class="glass-card" style="display: none; border-color: rgba(0, 230, 118, 0.2);">
+            <p style="font-size: 11px; color: #a0aec0; margin-bottom: 12px; margin-left: 5px;">* Số xu rút tối thiểu: <b style="color: #fff;">10.000 xu</b></p>
+            <div class="input-group">
+                <input type="number" id="withdraw-amount" placeholder="Nhập số xu cần rút">
+                <button class="btn-all" onclick="selectAllBalance()">TẤT CẢ</button>
+            </div>
+            <button id="withdrawBtn" class="btn" style="background:var(--accent-green); color:#000; width:100%; font-size: 14px;" onclick="processWithdraw()">RÚT TIỀN</button>
+        </div>
+        
+        <div class="history-section" id="withdraw-history" style="margin-top:20px;"></div>
+    </div>
+
+    <nav class="nav">
+        <div class="nav-item active" onclick="openTab('home', this)"><span>🏘️</span> TRANG CHỦ</div>
+        <div class="nav-item" onclick="openTab('tasks', this)"><span>🎯</span> NHIỆM VỤ</div>
+        <div class="nav-item" onclick="openTab('leaderboard', this)"><span>🏆</span> XẾP HẠNG</div>
+        <div class="nav-item" onclick="openTab('ref', this)"><span>🤝</span> HOA HỒNG</div>
+        <div class="nav-item" onclick="openTab('acc', this)"><span>💳</span> VÍ TIỀN</div>
+    </nav>
+
+<script>
+    // --- PHẦN 1: Firebase & Config ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyA20X-wxjtTMFTIXuvMhLQ81KP3FDFkLrA",
+        authDomain: "tramnangluong-app.firebaseapp.com",
+        databaseURL: "https://tramnangluong-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "tramnangluong-app",
+        storageBucket: "tramnangluong-app.firebasestorage.app",
+        messagingSenderId: "436978943176",
+        appId: "1:436978943176:web:dfe6725fe01fea6af2d1fd",
+        measurementId: "G-DM8GCH3Y3G"
+    };
+    
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const db = firebase.database();
+
+    // --- LẮNG NGHE TRẠNG THÁI KHÓA/MỞ RÚT TIỀN TỪ BOT ---
+    db.ref('system_settings/withdraw_active').on('value', (snapshot) => {
+        const isActive = snapshot.val();
+        const btnWithdraw = document.getElementById('withdrawBtn');
+        
+        if (isActive === false) {
+            window.isWithdrawLocked = true;
+            if (btnWithdraw) {
+                btnWithdraw.style.background = '#2d3748';
+                btnWithdraw.style.color = '#718096';
+                btnWithdraw.innerText = 'ĐANG BẢO TRÌ';
+            }
+        } else {
+            window.isWithdrawLocked = false;
+            if (btnWithdraw) {
+                btnWithdraw.style.background = 'var(--accent-green)';
+                btnWithdraw.style.color = '#000';
+                btnWithdraw.innerText = 'RÚT TIỀN';
+            }
+        }
+    });
+
+    const BOT_USERNAME = 'TramNangLuongVuTru_Bot';
+    const botToken = "8235163593:AAFoHyyFDKnqc0XBfwF0D2RCp18ND7HE-64";
+
+    const tgApp = window.Telegram.WebApp;
+    tgApp.expand();
+
+    // --- PHẦN 3: Game Core Logic ---
+    function safeHaptic() { if (tgApp.isVersionAtLeast('6.1')) tgApp.HapticFeedback.notificationOccurred('success'); }
+    function showAlert(msg) {
+        const alertBox = document.getElementById('custom-alert');
+        document.getElementById('alert-msg').innerText = msg;
+        alertBox.classList.add('show'); safeHaptic(); setTimeout(closeAlert, 4000);
+    }
+    function closeAlert() { document.getElementById('custom-alert').classList.remove('show'); }
+    function showHelp() { alert("CÔNG DỤNG THẺ:\n- Tự động kích hoạt khi hết giờ.\n- Giúp đào 24/7.\n- CÁCH KIẾM: Mời 1 người tham gia nhận ngay 1 thẻ!"); }
+
+    function openInfoModal() {
+        document.getElementById('infoModal').classList.add('active');
+        safeHaptic();
+    }
+    function closeInfoModal() {
+        document.getElementById('infoModal').classList.remove('active');
+        safeHaptic();
+    }
+
+    let myTgId = String(tgApp.initDataUnsafe?.user?.id || localStorage.getItem('tg_user_id') || "Guest_" + Math.floor(Math.random() * 999999));
+    localStorage.setItem('tg_user_id', myTgId);
+
+    let userData = { gold: 0, level: 1, autoCards: 0, startTime: null, lastUpdate: null, refCount: 0, bankData: null, history: [], lastDaily: "", completedTasks: [], invitedBy: null };
+    let isRunning = false; let interval; const DURATION = 5 * 3600 * 1000;
+
+    function loadUserData() {
+        const userRef = db.ref('users/' + myTgId);
+        userRef.on('value', (snapshot) => {
+            if (snapshot.exists()) {
+                let data = snapshot.val(); userData = { ...userData, ...data };
+                userData.gold = Number(userData.gold) || 0;
+            } else {
+                const startParam = tgApp.initDataUnsafe?.start_param;
+                if (startParam && String(startParam) !== myTgId) {
+                    userData.invitedBy = String(startParam); rewardReferrer(userData.invitedBy);
+                }
+                userRef.set(userData);
+            }
+            initSystem(); updateUI();
+        });
+    }
+
+    function getRandomRefReward() {
+        const rand = Math.random() * 100;
+        if (rand < 95) { return Math.floor(Math.random() * (300 - 100 + 1)) + 100; } 
+        else if (rand < 99) { return Math.floor(Math.random() * (500 - 300 + 1)) + 300; } 
+        else if (rand < 99.99) { return Math.floor(Math.random() * (1000 - 500 + 1)) + 500; } 
+        else { return Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000; }
+    }
+
+    async function rewardReferrer(refId) {
+        const rewardAmount = getRandomRefReward();
+        const refPath = db.ref('users/' + refId);
+        refPath.transaction((current) => {
+            if (current) {
+                current.gold = (Number(current.gold) || 0) + rewardAmount;
+                current.autoCards = (Number(current.autoCards) || 0) + 1;
+                current.refCount = (Number(current.refCount) || 0) + 1;
+            }
+            return current;
+        });
+    }
+
+    function syncToFirebase() { db.ref('users/' + myTgId).update(userData).then(showSync); }
+
+    function updateUI() {
+        document.getElementById('coins').innerText = userData.gold.toFixed(4);
+        document.getElementById('balance').innerText = Math.floor(userData.gold).toLocaleString();
+        document.getElementById('lvl').innerText = userData.level;
+        document.getElementById('rate').innerText = 100 + (userData.level - 1) * 50;
+        document.getElementById('ref-count').innerText = userData.refCount || 0;
+        document.getElementById('auto-card-val').innerText = userData.autoCards;
+        document.getElementById('ref-link').value = `https://t.me/${BOT_USERNAME}/TramNangLuongVuTru?startapp=${myTgId}`;
+        checkMissionsStatus(); checkBankData(); renderHistory();
+    }
+
+    function runMiningLoop() {
+        if(isRunning) return;
+        isRunning = true;
+        document.getElementById('startBtn').classList.remove('ready');
+        document.getElementById('startBtn').innerText = "ĐANG KHAI THÁC...";
+        document.getElementById('core-wrap').classList.add('active-core');
+        if(interval) clearInterval(interval);
+        
+        interval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - userData.startTime;
+            const remaining = DURATION - elapsed;
+            
+            if (remaining <= 0) {
+                if (userData.autoCards > 0) {
+                    userData.autoCards--; 
+                    userData.startTime = now; 
+                    userData.lastUpdate = now;
+                    syncToFirebase(); 
+                    safeHaptic();
+                } else stopMining();
+            } else {
+                let hourlyRate = 100 + (userData.level - 1) * 50;
+                
+                let timeDiff = now - (userData.lastUpdate || now);
+                userData.gold += (timeDiff / 1000) * (hourlyRate / 3600);
+                userData.lastUpdate = now;
+                
+                document.getElementById('coins').innerText = userData.gold.toFixed(4);
+                document.getElementById('balance').innerText = Math.floor(userData.gold).toLocaleString();
+                if(Math.floor(elapsed/1000) % 30 === 0) syncToFirebase();
+                
+                let s = Math.floor(remaining / 1000);
+                let h = Math.floor(s / 3600).toString().padStart(2, '0');
+                let m = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
+                let sec = (s % 60).toString().padStart(2, '0');
+                document.getElementById('timer').innerText = `${h}:${m}:${sec}`;
+            }
+        }, 1000);
+    }
+
+    function initSystem() {
+        if (userData.startTime) {
+            const now = Date.now();
+            let elapsed = now - userData.startTime;
+            let hourlyRate = 100 + (userData.level - 1) * 50;
+
+            if (elapsed >= DURATION) {
+                let totalCycles = Math.floor(elapsed / DURATION);
+                let cardsToUse = Math.min(totalCycles - 1, userData.autoCards);
+                
+                let cyclesMined = 1 + (cardsToUse > 0 ? cardsToUse : 0);
+                userData.gold += (hourlyRate * 5) * cyclesMined;
+                userData.autoCards -= (cardsToUse > 0 ? cardsToUse : 0);
+                
+                userData.startTime += cyclesMined * DURATION;
+                
+                let remainingTime = now - userData.startTime;
+                if (remainingTime > 0 && remainingTime < DURATION) {
+                    userData.gold += (remainingTime / 1000) * (hourlyRate / 3600);
+                }
+                
+                userData.lastUpdate = now;
+                
+                if (now - userData.startTime < DURATION) runMiningLoop(); 
+                else stopMining();
+                
+                syncToFirebase();
+            } else {
+                if (userData.lastUpdate) {
+                    let offlineTime = now - userData.lastUpdate;
+                    if (offlineTime > 0) {
+                        userData.gold += (offlineTime / 1000) * (hourlyRate / 3600);
+                    }
+                }
+                userData.lastUpdate = now;
+                syncToFirebase();
+                runMiningLoop();
+            }
+        }
+    }
+
+    function startMining() { 
+        if(isRunning) return; 
+        let now = Date.now();
+        userData.startTime = now; 
+        userData.lastUpdate = now; 
+        syncToFirebase(); 
+        runMiningLoop(); 
+    }
+
+    function stopMining() {
+        clearInterval(interval); 
+        isRunning = false; 
+        userData.startTime = null; 
+        userData.lastUpdate = null;
+        syncToFirebase();
+        document.getElementById('startBtn').classList.add('ready');
+        document.getElementById('core-wrap').classList.remove('active-core');
+        document.getElementById('timer').innerText = "05:00:00";
+    }
+
+    function claimDaily() {
+        const today = new Date().toDateString();
+        if(userData.lastDaily === today) return alert("Đã nhận rồi!");
+        const r = Math.floor(Math.random() * 201) + 100;
+        userData.gold += r; userData.lastDaily = today; syncToFirebase(); alert(`+${r} xu!`);
+    }
+
+    async function checkTelegramDirect(chatId, btnId, reward) {
+        const btn = document.getElementById(btnId);
+        btn.innerText = "ĐANG KIỂM TRA..."; btn.disabled = true;
+        try {
+            const res = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${chatId}&user_id=${myTgId}`);
+            const data = await res.json();
+            if (data.ok && ["member", "administrator", "creator"].includes(data.result.status)) {
+                if (!(userData.completedTasks || []).includes(chatId)) {
+                    userData.gold += reward; if(!userData.completedTasks) userData.completedTasks = [];
+                    userData.completedTasks.push(chatId); syncToFirebase(); alert("Thành công! +1000 Xu");
+                    btn.innerText = "XONG"; btn.disabled = true;
+                } else alert("Đã nhận rồi!");
+            } else { alert("Bạn chưa tham gia! Hãy bấm MỞ TELEGRAM trước."); btn.innerText = "KIỂM TRA & NHẬN"; btn.disabled = false; }
+        } catch (e) { alert("Lỗi kết nối."); btn.innerText = "KIỂM TRA & NHẬN"; btn.disabled = false; }
+    }
+
+    function saveBankInfo() {
+        const b = document.getElementById('input-bank').value;
+        const n = document.getElementById('input-name').value;
+        const num = document.getElementById('input-num').value;
+        if(!b || !n || !num) return alert("Nhập đủ thông tin!");
+        userData.bankData = { bank: b, name: n, num: num }; syncToFirebase();
+    }
+
+    async function processWithdraw() {
+        if (window.isWithdrawLocked) {
+            return alert("🛑 Hệ thống rút tiền hiện đang bảo trì. Vui lòng quay lại sau!");
+        }
+
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        const amountInput = document.getElementById('withdraw-amount');
+        const amount = Math.floor(Number(amountInput.value));
+
+        if (isNaN(amount) || amount < 10000) return alert("Số xu rút tối thiểu là 10.000 xu!");
+        if (amount > userData.gold) return alert("Số dư không đủ!");
+
+        if (confirm(`Xác nhận rút ${amount.toLocaleString()} VNĐ?`)) {
+            withdrawBtn.disabled = true; 
+            withdrawBtn.innerText = "Duyệt trong vòng 24h";
+
+            try {
+                const timeStr = new Date().toLocaleString('vi-VN');
+                const reqData = { userId: myTgId, amount: amount, bank: userData.bankData, date: timeStr, status: "Duyệt trong vòng 24h" };
+
+                await db.ref('withdraw_requests').push(reqData);
+
+                const channelId = "-1003611632233";
+                const message = `🔔 <b>YÊU CẦU RÚT TIỀN MỚI</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>ID:</b> <code>${myTgId}</code>\n💰 <b>Số tiền:</b> ${amount.toLocaleString()} VNĐ\n🏦 <b>Ngân hàng:</b> ${userData.bankData.bank}\n👤 <b>Chủ TK:</b> ${userData.bankData.name.toUpperCase()}\n💳 <b>Số TK:</b> <code>${userData.bankData.num}</code>\n⏰ <b>Thời gian:</b> ${timeStr}\n━━━━━━━━━━━━━━━━━━\n<i>Hệ thống đang chờ duyệt...</i>`;
+
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: channelId, text: message, parse_mode: 'HTML' })
+                });
+
+                userData.gold -= amount;
+                if (!userData.history) userData.history = [];
+                userData.history.unshift(reqData);
+                await syncToFirebase();
+                
+                alert("Đã gửi yêu cầu rút tiền thành công!");
+                amountInput.value = "";
+                updateUI();
+            } catch (e) { alert("Lỗi gửi yêu cầu! Thử lại sau."); } 
+            finally { 
+                withdrawBtn.disabled = false; 
+                withdrawBtn.innerText = window.isWithdrawLocked ? "ĐANG BẢO TRÌ" : "RÚT TIỀN"; 
+            }
+        }
+    }
+
+    function checkBankData() {
+        const d = document.getElementById('bank-info-display');
+        const f = document.getElementById('bank-form-input');
+        const w = document.getElementById('withdraw-area');
+        if(userData.bankData) {
+            document.getElementById('disp-bank').innerText = userData.bankData.bank;
+            document.getElementById('disp-name').innerText = userData.bankData.name.toUpperCase();
+            document.getElementById('disp-num').innerText = userData.bankData.num;
+            d.style.display = 'block'; f.style.display = 'none'; w.style.display = 'block';
+        } else { d.style.display = 'none'; f.style.display = 'block'; w.style.display = 'none'; }
+    }
+
+    function renderHistory() {
+        const h = document.getElementById('withdraw-history');
+        if(!userData.history) return;
+        h.innerHTML = userData.history.map(i => `
+            <div class="history-item">
+                <div>
+                    <div style="font-size: 14px; font-weight: 900; color: var(--accent-gold); margin-bottom: 4px;">-${i.amount.toLocaleString()} Xu</div>
+                    <div style="font-size: 11px; color: #718096;">${i.date}</div>
+                </div>
+                <div style="font-size: 11px; color: var(--core-color); background: rgba(0, 242, 254, 0.1); padding: 4px 8px; border-radius: 6px; font-weight: bold;">Đang duyệt</div>
+            </div>
+        `).join('');
+    }
+
+    function checkMissionsStatus() {
+        if(userData.lastDaily === new Date().toDateString()) {
+            const b = document.getElementById('btn-daily'); if(b) { b.innerText = "ĐÃ NHẬN"; b.disabled = true; }
+        }
+        (userData.completedTasks || []).forEach(id => {
+            let b = null;
+            if (id === '-1003899907254') b = document.getElementById('btn-group');
+            else if (id === '-1003611632233') b = document.getElementById('btn-channel');
+            else if (id === '-1002900522909') b = document.getElementById('btn-lixi');
+            else if (id === '-1002618812008') b = document.getElementById('btn-new-channel');
+            if(b) { b.innerText = "XONG"; b.disabled = true; }
+        });
+    }
+
+    document.getElementById('upgradeBtn').onclick = () => {
+        if(userData.gold >= 5000) { userData.gold -= 5000; userData.level++; syncToFirebase(); updateUI(); } else alert("Thiếu xu!");
+    };
+
+    /* HÀM TẢI BẢNG XẾP HẠNG */
+    async function loadLeaderboard() {
+        const listDiv = document.getElementById('leaderboard-list');
+        listDiv.innerHTML = '<div style="text-align:center; color:#a0aec0; padding:20px;">Đang tải dữ liệu từ máy chủ...</div>';
+        try {
+            const snap = await db.ref('users').once('value');
+            const usersObj = snap.val();
+            if (!usersObj) {
+                listDiv.innerHTML = '<div style="text-align:center; color:#a0aec0;">Chưa có dữ liệu xếp hạng.</div>';
+                return;
+            }
+            
+            const usersArr = [];
+            for (let id in usersObj) {
+                if(id === "5305229011") continue; 
+                
+                usersArr.push({
+                    id: id,
+                    gold: Number(usersObj[id].gold) || 0,
+                    level: Number(usersObj[id].level) || 1
+                });
+            }
+            
+            usersArr.sort((a, b) => b.gold - a.gold);
+            const topUsers = usersArr.slice(0, 50); 
+            
+            let html = '';
+            topUsers.forEach((u, index) => {
+                let posClass = "";
+                let posStr = `#${index + 1}`;
+                
+                if (index === 0) { posStr = '🥇'; posClass = "top-1"; }
+                else if (index === 1) { posStr = '🥈'; posClass = "top-2"; }
+                else if (index === 2) { posStr = '🥉'; posClass = "top-3"; }
+                
+                let displayId = u.id;
+                if(u.id.length > 6 && !u.id.startsWith("Guest")) {
+                    displayId = u.id.substring(0, u.id.length - 3) + '***';
+                }
+
+                html += `
+                <div class="rank-item ${posClass}">
+                    <div class="rank-pos">${posStr}</div>
+                    <div class="rank-info">
+                        <div class="rank-id">ID: ${displayId}</div>
+                        <div class="rank-lvl">Cấp ${u.level}</div>
+                    </div>
+                    <div class="rank-gold">${Math.floor(u.gold).toLocaleString()}<br><span style="font-size:9px; color:#a0aec0; font-family:'Inter'">XU</span></div>
+                </div>`;
+            });
+            listDiv.innerHTML = html;
+        } catch(e) {
+            listDiv.innerHTML = '<div style="text-align:center; color:#ff4757;">Lỗi tải dữ liệu. Vui lòng thử lại sau!</div>';
+        }
+    }
+
+    function openTab(id, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById(id).classList.add('active'); el.classList.add('active');
+        
+        if (id === 'leaderboard') loadLeaderboard();
+        safeHaptic();
+    }
+
+    function copyRefLink() {
+        const l = document.getElementById('ref-link'); 
+        l.select(); 
+        l.setSelectionRange(0, 99999); 
+        document.execCommand('copy');
+        safeHaptic(); 
+        alert("Đã chép link mời thành công!");
+    }
+
+    function showSync() { const s = document.getElementById('sync-toast'); if(s) { s.style.display='block'; setTimeout(()=>s.style.display='none',1000); } }
+    function selectAllBalance() { document.getElementById('withdraw-amount').value = Math.floor(userData.gold); }
+    function editBankInfo() { userData.bankData = null; syncToFirebase(); }
+    document.getElementById('startBtn').onclick = startMining;
+
+    window.addEventListener('DOMContentLoaded', () => { loadUserData(); });
+</script>
+
+</body>
+</html>
