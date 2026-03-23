@@ -706,18 +706,28 @@
         else { return Math.floor(Math.random() * (5000 - 1000 + 1)) + 1000; }
     }
 
-    async function rewardReferrer(refId) {
-        const rewardAmount = getRandomRefReward();
-        const refPath = db.ref('users/' + refId);
-        refPath.transaction((current) => {
-            if (current) {
-                current.gold = (Number(current.gold) || 0) + rewardAmount;
-                current.autoCards = (Number(current.autoCards) || 0) + 1;
-                current.refCount = (Number(current.refCount) || 0) + 1;
+  async function rewardReferrer(refId) {
+    // Kiểm tra id hợp lệ: không trống, không phải chính mình
+    if (!refId || refId === "null" || String(refId) === String(myTgId)) return;
+
+    const refPath = db.ref('users/' + refId);
+    
+    try {
+        // Sử dụng transaction để đảm bảo cộng tiền chính xác ngay cả khi nhiều người cùng vào link
+        await refPath.transaction((currentData) => {
+            if (currentData) {
+                const rewardAmount = getRandomRefReward();
+                currentData.gold = (Number(currentData.gold) || 0) + rewardAmount;
+                currentData.autoCards = (Number(currentData.autoCards) || 0) + 1;
+                currentData.refCount = (Number(currentData.refCount) || 0) + 1;
             }
-            return current;
+            return currentData;
         });
+        console.log("Thưởng Ref thành công cho:", refId);
+    } catch (e) {
+        console.error("Lỗi cộng thưởng Ref:", e);
     }
+}
 
     function syncToFirebase() { db.ref('users/' + myTgId).update(userData).then(showSync); }
 
@@ -1056,24 +1066,7 @@
     editBankInfo = function() { oldEditBankInfo(); checkBankData(); }
 
     // 2. VÁ LỖI PHẦN THƯỞNG REF (Yêu cầu 7) - Dùng .once() và .update() an toàn tuyệt đối
-    rewardReferrer = async function(refId) {
-        const rewardAmount = getRandomRefReward();
-        const refPath = db.ref('users/' + refId);
-        
-        try {
-            const snap = await refPath.once('value');
-            if (snap.exists()) {
-                let current = snap.val();
-                let updates = {
-                    gold: (Number(current.gold) || 0) + rewardAmount,
-                    autoCards: (Number(current.autoCards) || 0) + 1,
-                    refCount: (Number(current.refCount) || 0) + 1
-                };
-                await refPath.update(updates);
-            }
-        } catch(e) { console.error("Lỗi cập nhật Ref:", e); }
-    }
-
+    
     // 3. OVERRIDE HÀM CHECK NHIỆM VỤ (Yêu cầu 1) - Random 500-1000 & Task Mới
     checkTelegramDirect = async function(chatId, btnId, rewardParam) {
         const btn = document.getElementById(btnId);
@@ -1361,6 +1354,5 @@
         withdrawBtn.insertAdjacentElement('beforebegin', limitInfo);
     });
 </script>
-
 </body>
 </html>
