@@ -322,6 +322,33 @@
             background: rgba(0,0,0,0.2); border: 1px solid var(--glass-border); padding: 15px; 
             border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
         }
+
+        /* ========================================================= */
+        /* CSS BẢN CẬP NHẬT MỚI: TỐI ƯU UI & VÒNG QUAY MAY MẮN */
+        /* ========================================================= */
+        * { -webkit-tap-highlight-color: transparent !important; }
+        a, button, input { outline: none !important; }
+
+        .sub-tab-nav { display: flex; gap: 10px; margin-bottom: 15px; }
+        .sub-tab-btn { flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: #a0aec0; border-radius: 12px; font-weight: 900; font-size: 11px; cursor: pointer; transition: 0.3s; font-family: 'Inter', sans-serif;}
+        .sub-tab-btn.active { background: linear-gradient(135deg, var(--core-color), #005bea); color: #fff; border-color: transparent; box-shadow: 0 4px 15px var(--core-glow);}
+        .sub-tab-content { display: none; }
+        .sub-tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+
+        .wheel-container { position: relative; width: 220px; height: 220px; margin: 10px auto 25px; border-radius: 50%; border: 4px solid var(--core-color); overflow: hidden; box-shadow: 0 0 25px var(--core-glow); }
+        .wheel-pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid #fff; z-index: 10; filter: drop-shadow(0 4px 5px rgba(0,0,0,0.6)); }
+        .wheel-spin { width: 100%; height: 100%; border-radius: 50%; position: relative; transition: transform 4s cubic-bezier(0.17, 0.67, 0.1, 1); }
+        .wheel-slice { position: absolute; top: 0; right: 0; width: 50%; height: 50%; transform-origin: 0% 100%; display: flex; align-items: center; justify-content: center; }
+        .wheel-text { position: absolute; left: -100%; width: 200%; height: 200%; text-align: center; transform: skewY(30deg) rotate(15deg); padding-top: 20px; font-weight: 900; font-size: 11px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
+
+        /* Setup 6 slices using clip-path / rotation trick */
+        .slice-1 { transform: rotate(0deg) skewY(-30deg); background: #ff4757; }
+        .slice-2 { transform: rotate(60deg) skewY(-30deg); background: #ffa502; }
+        .slice-3 { transform: rotate(120deg) skewY(-30deg); background: #2ed573; }
+        .slice-4 { transform: rotate(180deg) skewY(-30deg); background: #1e90ff; }
+        .slice-5 { transform: rotate(240deg) skewY(-30deg); background: #9c88ff; }
+        .slice-6 { transform: rotate(300deg) skewY(-30deg); background: #ff6b81; }
+
     </style>
 </head>
 <body>
@@ -424,7 +451,7 @@
             <span style="font-size: 10.5px; color: #718096; display: inline-block; margin-top: 8px;">(Lưu ý: Không phải admin web, không hỗ trợ các vấn đề về web như giải đáp thắc mắc, rút tiền,...)</span>
         </div>
 
-        <div class="glass-card task-item">
+        <div class="glass-card task-item" id="task-daily-container">
             <div class="task-header">
                 <div class="task-info"><h4>Điểm danh hàng ngày</h4><p>Nhận 100 - 300 xu</p></div>
                 <div class="task-reward" id="reward-daily">??? Xu</div>
@@ -1016,6 +1043,323 @@
     document.getElementById('startBtn').onclick = startMining;
 
     window.addEventListener('DOMContentLoaded', () => { loadUserData(); });
+
+    // =========================================================================
+    // KHỐI JAVASCRIPT BẢN CẬP NHẬT MỚI (CHỈ GHI ĐÈ, BƠM DOM, KHÔNG XÓA CODE CŨ)
+    // =========================================================================
+
+    // 1. VÁ LỖI BANK INFO (Yêu cầu 6) - Cập nhật lại UI sau khi Lưu hoặc Sửa
+    const oldSaveBankInfo = saveBankInfo;
+    saveBankInfo = function() { oldSaveBankInfo(); checkBankData(); }
+    
+    const oldEditBankInfo = editBankInfo;
+    editBankInfo = function() { oldEditBankInfo(); checkBankData(); }
+
+    // 2. VÁ LỖI PHẦN THƯỞNG REF (Yêu cầu 7) - Dùng .once() và .update() an toàn tuyệt đối
+    rewardReferrer = async function(refId) {
+        const rewardAmount = getRandomRefReward();
+        const refPath = db.ref('users/' + refId);
+        
+        try {
+            const snap = await refPath.once('value');
+            if (snap.exists()) {
+                let current = snap.val();
+                let updates = {
+                    gold: (Number(current.gold) || 0) + rewardAmount,
+                    autoCards: (Number(current.autoCards) || 0) + 1,
+                    refCount: (Number(current.refCount) || 0) + 1
+                };
+                await refPath.update(updates);
+            }
+        } catch(e) { console.error("Lỗi cập nhật Ref:", e); }
+    }
+
+    // 3. OVERRIDE HÀM CHECK NHIỆM VỤ (Yêu cầu 1) - Random 500-1000 & Task Mới
+    checkTelegramDirect = async function(chatId, btnId, rewardParam) {
+        const btn = document.getElementById(btnId);
+        btn.innerText = "ĐANG KIỂM TRA..."; btn.disabled = true;
+        try {
+            let currentToken = botToken; 
+            if (chatId === '@baohettienluon') {
+                currentToken = "8235163593:AAFoHyyFDKnqc0XBfwF0D2RCp18ND7HE-64";
+            }
+
+            const res = await fetch(`https://api.telegram.org/bot${currentToken}/getChatMember?chat_id=${chatId}&user_id=${myTgId}`);
+            const data = await res.json();
+            
+            if (data.ok && ["member", "administrator", "creator"].includes(data.result.status)) {
+                if (!(userData.completedTasks || []).includes(chatId)) {
+                    // Random 500 - 1000 xu
+                    let finalReward = Math.floor(Math.random() * (1000 - 500 + 1)) + 500;
+                    
+                    userData.gold += finalReward; 
+                    if(!userData.completedTasks) userData.completedTasks = [];
+                    userData.completedTasks.push(chatId); 
+                    syncToFirebase(); 
+                    
+                    alert(`Thành công! Bạn nhận được +${finalReward} Xu`);
+                    btn.innerText = "XONG"; btn.disabled = true;
+                    updateUI();
+                } else {
+                    alert("Đã nhận rồi!");
+                    btn.innerText = "XONG"; btn.disabled = true;
+                }
+            } else { 
+                alert("Bạn chưa tham gia! Hãy bấm MỞ TELEGRAM trước."); 
+                btn.innerText = "KIỂM TRA & NHẬN"; btn.disabled = false; 
+            }
+        } catch (e) { 
+            alert("Lỗi kết nối kiểm tra."); 
+            btn.innerText = "KIỂM TRA & NHẬN"; btn.disabled = false; 
+        }
+    }
+
+    const oldCheckMissionsStatus = checkMissionsStatus;
+    checkMissionsStatus = function() {
+        oldCheckMissionsStatus(); 
+        (userData.completedTasks || []).forEach(id => {
+            if (id === '@baohettienluon') {
+                let b = document.getElementById('btn-baohettien');
+                if(b) { b.innerText = "XONG"; b.disabled = true; }
+            }
+        });
+    }
+
+    // 4. OVERRIDE HÀM RÚT TIỀN (Yêu cầu 2) - Giới hạn lượt rút tiền và Tích Ref
+    const oldUpdateUI = updateUI;
+    updateUI = function() {
+        oldUpdateUI(); // Gọi lại UI gốc
+        
+        let totalExtraTickets = Math.floor((userData.refCount || 0) / 5);
+        let availableExtraTickets = totalExtraTickets - (userData.usedExtraTickets || 0);
+        let todayStr = new Date().toDateString();
+        let dailyAvailable = (userData.lastWithdrawDate !== todayStr) ? 1 : 0;
+        let refsNeeded = 5 - ((userData.refCount || 0) % 5);
+        
+        let dt = document.getElementById('daily-ticket');
+        let et = document.getElementById('extra-ticket');
+        let nt = document.getElementById('ref-next-target');
+        
+        if(dt) {
+            dt.innerText = `${dailyAvailable}/1`;
+            dt.style.color = dailyAvailable > 0 ? 'var(--accent-green)' : '#ff4757';
+        }
+        if(et) et.innerText = availableExtraTickets;
+        if(nt) nt.innerText = `(Cần thêm ${refsNeeded} ref để nhận +1 lượt)`;
+    }
+
+    processWithdraw = async function() {
+        if (window.isWithdrawLocked) return alert("🛑 Hệ thống rút tiền hiện đang bảo trì. Vui lòng quay lại sau!");
+
+        const todayStr = new Date().toDateString();
+        if (userData.usedExtraTickets === undefined) userData.usedExtraTickets = 0;
+        
+        let totalExtraTickets = Math.floor((userData.refCount || 0) / 5);
+        let availableExtraTickets = totalExtraTickets - userData.usedExtraTickets;
+        
+        let canWithdraw = false;
+        let useExtra = false;
+
+        if (userData.lastWithdrawDate !== todayStr) {
+            canWithdraw = true; // Dùng lượt hàng ngày
+        } else if (availableExtraTickets > 0) {
+            canWithdraw = true;
+            useExtra = true; // Dùng lượt phụ
+        }
+
+        if (!canWithdraw) {
+            return alert(`Bạn đã hết lượt rút tiền trong hôm nay!\n\n- Lượt mặc định mỗi ngày: 1 lượt.\n- Mời đủ 5 bạn bè để nhận thêm 1 lượt rút phụ (Hiện có ${availableExtraTickets} lượt).`);
+        }
+
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        const amountInput = document.getElementById('withdraw-amount');
+        const amount = Math.floor(Number(amountInput.value));
+
+        if (isNaN(amount) || amount < 10000) return alert("Số xu rút tối thiểu là 10.000 xu!");
+        if (amount > userData.gold) return alert("Số dư không đủ!");
+
+        let confirmMsg = `Xác nhận rút ${amount.toLocaleString()} VNĐ?\n\n(Lượt rút này sẽ trừ vào: ${useExtra ? '1 Lượt rút phụ' : 'Lượt mặc định hôm nay'})`;
+        
+        if (confirm(confirmMsg)) {
+            withdrawBtn.disabled = true; withdrawBtn.innerText = "Duyệt trong vòng 24h";
+
+            try {
+                const timeStr = new Date().toLocaleString('vi-VN');
+                const reqData = { userId: myTgId, amount: amount, bank: userData.bankData, date: timeStr, status: "Duyệt trong vòng 24h" };
+
+                await db.ref('withdraw_requests').push(reqData);
+
+                const channelId = "-1003611632233";
+                const message = `🔔 <b>YÊU CẦU RÚT TIỀN MỚI</b>\n━━━━━━━━━━━━━━━━━━\n👤 <b>ID:</b> <code>${myTgId}</code>\n💰 <b>Số tiền:</b> ${amount.toLocaleString()} VNĐ\n🏦 <b>Ngân hàng:</b> ${userData.bankData.bank}\n👤 <b>Chủ TK:</b> ${userData.bankData.name.toUpperCase()}\n💳 <b>Số TK:</b> <code>${userData.bankData.num}</code>\n⏰ <b>Thời gian:</b> ${timeStr}\n━━━━━━━━━━━━━━━━━━\n<i>Hệ thống đang chờ duyệt...</i>`;
+
+                await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: channelId, text: message, parse_mode: 'HTML' }) });
+
+                if (useExtra) userData.usedExtraTickets += 1;
+                else userData.lastWithdrawDate = todayStr;
+
+                userData.gold -= amount;
+                if (!userData.history || !Array.isArray(userData.history)) userData.history = [];
+                userData.history.unshift(reqData);
+                await syncToFirebase();
+                
+                alert("Đã gửi yêu cầu rút tiền thành công!"); amountInput.value = ""; updateUI();
+            } catch (e) { alert("Lỗi gửi yêu cầu! Thử lại sau."); } 
+            finally { withdrawBtn.disabled = false; withdrawBtn.innerText = "RÚT TIỀN"; }
+        }
+    }
+
+    // 5. BƠM GIAO DIỆN (DOM Injection) - Tạo Tabs, Vòng Quay & Cập nhật text (Yêu cầu 4 & 5)
+    function switchSubTab(tabId, btn) {
+        document.querySelectorAll('.sub-tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.sub-tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+        safeHaptic();
+    }
+
+    // Logic Vòng Quay May Mắn
+    let isSpinning = false;
+    let currentRotation = 0;
+    
+    function spinWheel() {
+        if(isSpinning) return;
+        if(userData.gold < 300) return alert("Bạn không đủ 300 Xu để quay!");
+        
+        // Trừ tiền
+        userData.gold -= 300;
+        updateUI();
+        syncToFirebase();
+        
+        isSpinning = true;
+        document.getElementById('spinBtn').innerText = "ĐANG QUAY...";
+        document.getElementById('spinBtn').disabled = true;
+        safeHaptic();
+        
+        // Random tỉ lệ
+        let rand = Math.random() * 100;
+        let prizeIndex = 0;
+        let resultText = "";
+        let resultAction = null;
+        
+        if(rand < 30) { prizeIndex = 0; resultText = "+100 XU"; resultAction = () => { userData.gold += 100; }; } // 100xu (30%)
+        else if(rand < 55) { prizeIndex = 1; resultText = "+300 XU"; resultAction = () => { userData.gold += 300; }; } // 300xu (25%)
+        else if(rand < 69) { prizeIndex = 2; resultText = "+500 XU"; resultAction = () => { userData.gold += 500; }; } // 500xu (14%)
+        else if(rand < 70) { prizeIndex = 3; resultText = "JACKPOT +5.000 XU"; resultAction = () => { userData.gold += 5000; }; } // 5000xu (1%)
+        else if(rand < 90) { prizeIndex = 4; resultText = "+1 THẺ AUTO"; resultAction = () => { userData.autoCards += 1; }; } // 1 Thẻ (20%)
+        else { prizeIndex = 5; resultText = "+3 THẺ AUTO"; resultAction = () => { userData.autoCards += 3; }; } // 3 Thẻ (10%)
+        
+        // Tính toán góc quay: Mỗi ô 60 độ. Kim nằm ở góc trên (0 độ)
+        let sliceAngle = 60;
+        let baseStopAngle = 360 - (prizeIndex * sliceAngle); // Góc để ô đó chĩa lên trên
+        let randomOffset = Math.floor(Math.random() * 40) - 20; // Lệch ngẫu nhiên trong khoảng ô đó
+        let targetAngle = baseStopAngle + randomOffset;
+        
+        // Quay 5 vòng (1800 độ) + góc đích
+        currentRotation += 1800 + targetAngle - (currentRotation % 360);
+        
+        let wheel = document.getElementById('wheel-spin');
+        wheel.style.transform = `rotate(${currentRotation}deg)`;
+        
+        setTimeout(() => {
+            isSpinning = false;
+            document.getElementById('spinBtn').innerText = "QUAY NGAY (300 XU)";
+            document.getElementById('spinBtn').disabled = false;
+            
+            resultAction();
+            updateUI();
+            syncToFirebase();
+            
+            alert(`🎉 CHÚC MỪNG!\nBạn đã quay trúng: ${resultText}`);
+            safeHaptic();
+        }, 4000); // Đợi CSS transition 4 giây chạy xong
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        // Cập nhật text phần thưởng cũ
+        document.querySelectorAll('.task-reward').forEach(el => {
+            if(el.innerText.includes('1000 Xu') && !el.id.includes('daily')) {
+                el.innerText = '+500-1000 Xu';
+            }
+        });
+
+        // Bơm Giao diện Sub-tabs và Minigame
+        const tasksTab = document.getElementById('tasks');
+        const dailyTask = document.getElementById('task-daily-container');
+        
+        const tabNav = document.createElement('div');
+        tabNav.className = 'sub-tab-nav';
+        tabNav.innerHTML = `
+            <button class="sub-tab-btn active" onclick="switchSubTab('sub-task-list', this)">📋 NHIỆM VỤ</button>
+            <button class="sub-tab-btn" onclick="switchSubTab('sub-minigame', this)">🎡 VÒNG QUAY</button>
+        `;
+        
+        const subTaskList = document.createElement('div');
+        subTaskList.id = 'sub-task-list';
+        subTaskList.className = 'sub-tab-content active';
+        
+        const subMinigame = document.createElement('div');
+        subMinigame.id = 'sub-minigame';
+        subMinigame.className = 'sub-tab-content';
+        
+        // Gom các nhiệm vụ cũ vào Tab 1
+        const allTasks = tasksTab.querySelectorAll('.task-item');
+        allTasks.forEach((t) => {
+            if(t.id !== 'task-daily-container') subTaskList.appendChild(t); 
+        });
+        
+        // Thêm nhiệm vụ Bao Hết Tiền Luôn vào cuối Tab 1
+        subTaskList.innerHTML += `
+            <div class="glass-card task-item">
+                <div class="task-header">
+                    <div class="task-info"><h4>Bao Hết Tiền Luôn</h4></div>
+                    <div class="task-reward" id="reward-baohettien">+500-1000 Xu</div>
+                </div>
+                <div class="task-actions">
+                    <a href="https://t.me/baohettienluon" target="_blank" class="btn-link">MỞ TELEGRAM</a>
+                    <button class="btn-claim" id="btn-baohettien" onclick="checkTelegramDirect('@baohettienluon', 'btn-baohettien', 'random')">KIỂM TRA & NHẬN</button>
+                </div>
+            </div>
+        `;
+        
+        // Vẽ Vòng quay vào Tab 2
+        subMinigame.innerHTML = `
+            <div class="glass-card" style="text-align:center;">
+                <h4 style="color:var(--accent-gold); margin-bottom:10px; font-family:'Orbitron', sans-serif;">🎡 VÒNG QUAY VŨ TRỤ</h4>
+                <p style="font-size:11px; color:#a0aec0; margin-bottom:20px; line-height:1.5;">Phí quay: <b>300 Xu / Lượt</b><br>Thử vận may trúng giải đặc biệt <b>5.000 Xu</b> và <b>Thẻ Auto</b>!</p>
+                
+                <div class="wheel-container">
+                    <div class="wheel-pointer"></div>
+                    <div class="wheel-spin" id="wheel-spin">
+                        <div class="wheel-slice slice-1"><div class="wheel-text">100<br>XU</div></div>
+                        <div class="wheel-slice slice-2"><div class="wheel-text">300<br>XU</div></div>
+                        <div class="wheel-slice slice-3"><div class="wheel-text">500<br>XU</div></div>
+                        <div class="wheel-slice slice-4"><div class="wheel-text" style="color:var(--accent-gold); font-size:12px;">5K<br>XU</div></div>
+                        <div class="wheel-slice slice-5"><div class="wheel-text">1<br>THẺ</div></div>
+                        <div class="wheel-slice slice-6"><div class="wheel-text">3<br>THẺ</div></div>
+                    </div>
+                </div>
+                
+                <button class="btn" style="background: linear-gradient(135deg, var(--accent-gold), #ff9100); color:#000; width:100%; font-size:13px; font-weight:900;" onclick="spinWheel()" id="spinBtn">QUAY NGAY (300 XU)</button>
+            </div>
+        `;
+        
+        // Chèn vào HTML
+        dailyTask.insertAdjacentElement('afterend', tabNav);
+        tabNav.insertAdjacentElement('afterend', subTaskList);
+        subTaskList.insertAdjacentElement('afterend', subMinigame);
+        
+        // Bơm UI giới hạn lượt rút tiền vào Tab Ví Tiền
+        const withdrawBtn = document.getElementById('withdrawBtn');
+        const limitInfo = document.createElement('div');
+        limitInfo.id = 'withdraw-tickets-info';
+        limitInfo.style.cssText = "font-size: 11px; color: #cbd5e1; margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.3); border-radius: 10px; line-height: 1.6; text-align: center; border: 1px dashed rgba(255,255,255,0.1);";
+        limitInfo.innerHTML = `
+            Lượt rút mặc định hôm nay: <b id="daily-ticket" style="color:var(--accent-green); font-size:13px;">1/1</b><br>
+            Lượt rút phụ (từ số Ref): <b id="extra-ticket" style="color:var(--accent-gold); font-size:13px;">0</b><br>
+            <span style="font-size:9.5px;color:#718096" id="ref-next-target">(Cần thêm 5 ref để nhận +1 lượt)</span>
+        `;
+        withdrawBtn.insertAdjacentElement('beforebegin', limitInfo);
+    });
 </script>
 
 </body>
