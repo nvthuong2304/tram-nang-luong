@@ -363,7 +363,7 @@
 
                 <div class="intro-card">
                     <h4>💻 Thông Tin Web & Dev</h4>
-                    <p>• <b>Phiên bản:</b> 3.0.0 (Leaderboard Edition)</p>
+                    <p>• <b>Phiên bản:</b> 3.0.1 (Premium - Fixed Core)</p>
                     <p>• <b>Nhà phát triển:</b> NVTCode Developer</p>
                     <p>• <b>Công nghệ:</b> HTML5, CSS3, Firebase DB.</p>
                 </div>
@@ -646,10 +646,19 @@
 
     function loadUserData() {
         const userRef = db.ref('users/' + myTgId);
-        userRef.on('value', (snapshot) => {
+        // FIX: Dùng once() thay vì on() để tránh Vòng lặp vô hạn gây đơ đồng hồ
+        userRef.once('value').then((snapshot) => {
             if (snapshot.exists()) {
-                let data = snapshot.val(); userData = { ...userData, ...data };
+                let data = snapshot.val(); 
+                userData = { ...userData, ...data };
                 userData.gold = Number(userData.gold) || 0;
+                
+                // FIX: Xử lý mảng history nếu Firebase tự chuyển thành Object
+                if (userData.history && typeof userData.history === 'object' && !Array.isArray(userData.history)) {
+                    userData.history = Object.values(userData.history);
+                }
+                if (!userData.history) userData.history = [];
+                
             } else {
                 const startParam = tgApp.initDataUnsafe?.start_param;
                 if (startParam && String(startParam) !== myTgId) {
@@ -657,7 +666,8 @@
                 }
                 userRef.set(userData);
             }
-            initSystem(); updateUI();
+            initSystem(); 
+            updateUI();
         });
     }
 
@@ -860,7 +870,7 @@
                 });
 
                 userData.gold -= amount;
-                if (!userData.history) userData.history = [];
+                if (!userData.history || !Array.isArray(userData.history)) userData.history = [];
                 userData.history.unshift(reqData);
                 await syncToFirebase();
                 
@@ -887,13 +897,20 @@
         } else { d.style.display = 'none'; f.style.display = 'block'; w.style.display = 'none'; }
     }
 
+    // FIX: Xử lý triệt để Lịch sử rác/trống
     function renderHistory() {
         const h = document.getElementById('withdraw-history');
-        if(!userData.history) return;
-        h.innerHTML = userData.history.map(i => `
+        let histArr = userData.history;
+        
+        if (!histArr || !Array.isArray(histArr) || histArr.length === 0) {
+            h.innerHTML = '';
+            return;
+        }
+
+        h.innerHTML = histArr.map(i => `
             <div class="history-item">
                 <div>
-                    <div style="font-size: 14px; font-weight: 900; color: var(--accent-gold); margin-bottom: 4px;">-${i.amount.toLocaleString()} Xu</div>
+                    <div style="font-size: 14px; font-weight: 900; color: var(--accent-gold); margin-bottom: 4px;">-${Number(i.amount).toLocaleString()} Xu</div>
                     <div style="font-size: 11px; color: #718096;">${i.date}</div>
                 </div>
                 <div style="font-size: 11px; color: var(--core-color); background: rgba(0, 242, 254, 0.1); padding: 4px 8px; border-radius: 6px; font-weight: bold;">Đang duyệt</div>
